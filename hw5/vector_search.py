@@ -4,11 +4,22 @@ from collections import defaultdict
 from pymorphy3 import MorphAnalyzer
 
 
-class LemmaSearchEngine:
+class VectorSearchEngine:
     def __init__(self, tfidf_dir="../hw4/results/lemmas"):
         self.tfidf_dir = tfidf_dir
         self.doc_vectors, self.all_idf = self._load_vectors_and_idf()
         self.morph = MorphAnalyzer()
+        self.doc_links = self._load_document_links()
+
+    def _load_document_links(self):
+        links = {}
+        with open("../hw1/index.txt", "r", encoding="utf-8") as f:
+            for line in f:
+                parts = line.strip().split()
+                if len(parts) == 2:
+                    doc_id, url = parts
+                    links[doc_id] = url
+        return links
 
     def _load_vectors_and_idf(self):
         vectors = {}
@@ -40,14 +51,14 @@ class LemmaSearchEngine:
             tf[lemma] += 1 / total_terms
         return {lemma: tf[lemma] * self.all_idf.get(lemma, 0.0) for lemma in query_lemmas}
 
-    def search(self, query: str, top_n=10) -> list[tuple[str, float]]:
+    def search(self, query: str, top_n=10) -> list[tuple[str, float, str]]:
         query_lemmas = self.lemmatize_query(query)
         query_vector = self.build_query_vector(query_lemmas)
 
         scores = []
         for doc, doc_vector in self.doc_vectors.items():
             similarity = self.cosine_similarity(query_vector, doc_vector)
-            scores.append((doc, similarity))
+            scores.append((doc, similarity, self.doc_links.get(doc)))
 
         return sorted(scores, key=lambda x: x[1], reverse=True)[:top_n]
 
@@ -60,7 +71,7 @@ class LemmaSearchEngine:
 
 # Пример использования
 if __name__ == "__main__":
-    engine = LemmaSearchEngine()
+    engine = VectorSearchEngine()
     print("Поисковая система запущена. Введите 'exit' для выхода.\n")
 
     while True:
@@ -77,8 +88,8 @@ if __name__ == "__main__":
 
             # Вывод результатов
             print(f"\nРезультаты для запроса '{query}':")
-            for i, (doc, score) in enumerate(results, 1):
-                print(f"{i}. {doc} (сходство: {score:.4f})")
+            for i, (doc, score, url) in enumerate(results, 1):
+                print(f"{i}. {doc} (сходство: {score:.4f}) URL: {url}")
             print()
 
         except KeyboardInterrupt:
